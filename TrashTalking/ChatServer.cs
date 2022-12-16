@@ -3,9 +3,9 @@ using System.Net;
 
 namespace TrashTalking
 {
-    internal class ChatServer
+    internal class ChatServer : IDisposable
     {
-        public static List<ConnectedUser> Clients { get; } = new List<ConnectedUser>();
+        public List<DataListener> Clients { get; } = new List<DataListener>();
 
         private TcpListener listener;
 
@@ -21,16 +21,18 @@ namespace TrashTalking
             Console.WriteLine($"Waiting for any new connections... ");
             TcpClient client = await listener.AcceptTcpClientAsync();
 
-            var ipEndpoint = client.Client.RemoteEndPoint as IPEndPoint;
+            IPEndPoint ipEndpoint = (IPEndPoint)client.Client.RemoteEndPoint;
             Console.WriteLine($"Connection recieved from {ipEndpoint.Address}!");
 
-            var user = new ConnectedUser(this, client);
+            var user = new ConnectedUserServer(client, this);
             user.ClientDisconnected += ClientDisconnected;
+
+            await user.Initialize();
 
             Clients.Add(user);
         }
 
-        private void ClientDisconnected(ConnectedUser user, DisconnectReason disconnectReason)
+        private void ClientDisconnected(DataListener user)
         {
             user.ClientDisconnected -= ClientDisconnected;
 
@@ -40,7 +42,7 @@ namespace TrashTalking
 
         }
 
-        public async Task SendMessageToAllClients(ConnectedUser sender, string message)
+        public async Task SendMessageToAllClients(DataListener sender, string message)
         {
             foreach (var user in Clients)
             {
@@ -48,6 +50,14 @@ namespace TrashTalking
                     continue;
 
                 await user.SendMessage(sender, message);
+            }
+        }
+
+        public void Dispose()
+        {
+            foreach(var client in Clients)
+            {
+                client.Dispose();
             }
         }
     }
