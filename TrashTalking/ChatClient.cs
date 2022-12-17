@@ -3,6 +3,9 @@ using System.Net.Sockets;
 
 namespace TrashTalking
 {
+    /// <summary>
+    /// Manages connecting and disconnecting to the server, and stuff relating to that. Kind of a wrapper for <see cref="ClientListener"/>.
+    /// </summary>
     internal class ChatClient : IDisposable
     {
         public bool Connected => listener.Connected;
@@ -32,11 +35,9 @@ namespace TrashTalking
         public async Task HandleUserInput()
         {
             var line = Console.ReadLine();
-
-            Console.WriteLine(Connected);
             
             if(Connected)
-                await listener.SendMessage(listener, line);
+                await listener.SendMessage(new Message(listener.assignedId, line));
         }
 
         ~ChatClient()

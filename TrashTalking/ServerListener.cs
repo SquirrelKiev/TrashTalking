@@ -1,23 +1,77 @@
-﻿using System.Net.Sockets;
+﻿using Newtonsoft.Json;
+using System.Net.Mime;
+using System.Net.Sockets;
 using System.Text;
 
 namespace TrashTalking
 {
-    internal class ConnectedUserServer : DataListener
+    internal class ServerListener : DataListener
     {
-        public ConnectedUserServer(TcpClient client, ChatServer listener = null) : base(client, listener)
+        private ChatServer listener;
+
+        public event Action OnUserReady;
+        public bool userIsReady = false;
+
+        public ServerListener(TcpClient client, ChatServer listener) : base(client)
         {
-            
+            this.listener = listener;
         }
 
-        public override async Task RecievedData(byte[] bytes)
+        internal override async Task Initialize()
         {
-            var json = Encoding.UTF8.GetString(bytes);
+            assignedId = listener.currentUserId;
+        }
 
-            var state = ModelUtility.GetState(json);
+        protected override async Task RecievedData(ContentType contentType, string json)
+        {
+            try
+            {
+                switch (contentType)
+                {
+                    case ContentType.ClientReady:
+                        OnClientReady(json);
+                        break;
 
-            Console.WriteLine(state);
-            Console.WriteLine(json);
+                    case ContentType.ClientSendMessage:
+                        await OnMessageRecieved(json);
+                        break;
+
+                    default:
+                        throw new NotImplementedException();
+                }
+            }
+            catch(Exception ex)
+            {
+                Console.WriteLine(ex);
+            }
+        }
+
+        private async Task OnMessageRecieved(string json)
+        {
+            var messageObj = JsonConvert.DeserializeObject<Message>(json);
+
+            messageObj.senderIndex = assignedId;
+
+            await listener.SendMessageToAllClients(messageObj);
+        }
+
+        private void OnClientReady(string clientReadyJson)
+        {
+            var clientInfo = JsonConvert.DeserializeObject<ClientReadyState>(clientReadyJson);
+
+            UserName = clientInfo.username;
+
+            userIsReady = true;
+            OnUserReady.Invoke();
+        }
+
+        public async Task SendRoomState()
+        {
+            var chatRoomStateJson = JsonConvert.SerializeObject(listener.GetChatRoomState());
+
+            var data = Encoding.UTF8.GetBytes(chatRoomStateJson);
+
+            await stream.WriteAsync(data);
         }
     }
 }

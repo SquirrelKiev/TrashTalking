@@ -8,7 +8,7 @@ namespace TrashTalking
     {
         static async Task Main(string[] args)
         {
-            if (args.Length != 1)
+            if (args.Length < 1)
             {
                 Console.WriteLine("Invalid arguments.");
 
@@ -17,7 +17,7 @@ namespace TrashTalking
 
             if (args[0] == "client")
             {
-                await StartClient();
+                await StartClient(IPAddress.Parse(args[1]));
 
                 return;
             }
@@ -35,11 +35,11 @@ namespace TrashTalking
             }
         }
 
-        private static async Task StartClient()
+        private static async Task StartClient(IPAddress ip)
         {
             var chatClient = new ChatClient();
 
-            await chatClient.ConnectToServer(IPAddress.Loopback);
+            await chatClient.ConnectToServer(ip);
 
             while(chatClient.Connected)
             {

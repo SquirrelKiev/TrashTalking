@@ -4,11 +4,11 @@ namespace TrashTalking
 {
     internal static class ModelUtility
     {
-        public static State GetState(string json)
+        public static ContentType GetContentType(string json)
         {
-            var simpleState = JsonConvert.DeserializeObject<SimpleState>(json);
+            var simpleState = JsonConvert.DeserializeObject<EmptyContentType>(json);
 
-            return simpleState.state;
+            return simpleState.contentType;
         }
     }
 }

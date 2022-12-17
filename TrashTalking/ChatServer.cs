@@ -3,9 +3,14 @@ using System.Net;
 
 namespace TrashTalking
 {
+    /// <summary>
+    /// Manages chat server connections.
+    /// </summary>
     internal class ChatServer : IDisposable
     {
-        public List<DataListener> Clients { get; } = new List<DataListener>();
+        internal int currentUserId { get; private set; }
+
+        public List<ServerListener> Clients { get; } = new List<ServerListener>();
 
         private TcpListener listener;
 
@@ -24,32 +29,57 @@ namespace TrashTalking
             IPEndPoint ipEndpoint = (IPEndPoint)client.Client.RemoteEndPoint;
             Console.WriteLine($"Connection recieved from {ipEndpoint.Address}!");
 
-            var user = new ConnectedUserServer(client, this);
+            var user = new ServerListener(client, this);
+
             user.ClientDisconnected += ClientDisconnected;
+            user.OnUserReady += SendRoomState;
 
             await user.Initialize();
 
             Clients.Add(user);
+
+            currentUserId++;
+        }
+
+        private void SendRoomState()
+        {
+            foreach (var client in Clients)
+            {
+                // need to make this await
+                client.SendRoomState();
+            }
+        }
+
+        internal ChatRoomState GetChatRoomState()
+        {
+            return new ChatRoomState(Clients.Select(x => (DataListener)x).ToList());
         }
 
         private void ClientDisconnected(DataListener user)
         {
-            user.ClientDisconnected -= ClientDisconnected;
+            var client = (ServerListener)user;
 
-            user.Dispose();
+            client.ClientDisconnected -= ClientDisconnected;
 
-            Clients.Remove(user);
+            client.Dispose();
 
+            Clients.Remove(client);
+
+            SendRoomState();
         }
 
-        public async Task SendMessageToAllClients(DataListener sender, string message)
+        public async Task SendMessageToAllClients(Message message)
         {
+            
+
             foreach (var user in Clients)
             {
-                if (user == sender)
+                Console.WriteLine($"{message.senderIndex} {user.assignedId}");
+
+                if (message.senderIndex == user.assignedId)
                     continue;
 
-                await user.SendMessage(sender, message);
+                await user.SendMessage(message);
             }
         }
 

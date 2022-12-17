@@ -1,4 +1,5 @@
 ﻿using System.Net.Sockets;
+using System.Runtime.CompilerServices;
 using System.Text;
 using Newtonsoft.Json;
 
@@ -6,26 +7,53 @@ namespace TrashTalking
 {
     internal class ClientListener : DataListener
     {
-        public ClientListener(TcpClient client, ChatServer listener = null) : base(client, listener)
+        ConnectedUserState[] connectedUsers;
+
+        public ClientListener(TcpClient client) : base(client)
         {
 
         }
 
         internal override async Task Initialize()
         {
-            string handshakeJson = JsonConvert.SerializeObject(new SimpleState(State.ClientReady));
+            string handshakeJson = JsonConvert.SerializeObject(new ClientReadyState($"farts {Random.Shared.Next(1,1000)}"));
             byte[] data = Encoding.UTF8.GetBytes(handshakeJson);
 
             await stream.WriteAsync(data);
         }
 
-        public override async Task RecievedData(byte[] bytes)
+        protected override async Task RecievedData(ContentType contentType, string json)
         {
-            var json = Encoding.UTF8.GetString(bytes);
+            switch(contentType)
+            {
+                case ContentType.ServerChatRoomState:
+                    OnRecievedChatRoomState(JsonConvert.DeserializeObject<ChatRoomState>(json));
+                    break;
 
-            var state = ModelUtility.GetState(json);
+                case ContentType.ClientSendMessage:
+                    OnRecievedMessage(json);
+                    break;
 
-            Console.WriteLine(json);
+                default:
+                    throw new NotImplementedException();
+            }
+        }
+
+        private void OnRecievedMessage(string json)
+        {
+            var messageObj = JsonConvert.DeserializeObject<Message>(json);
+
+            Console.WriteLine($"{connectedUsers.First(x => { return x.id == messageObj.senderIndex; }).username}: {messageObj.message}");
+        }
+
+        private void OnRecievedChatRoomState(ChatRoomState state)
+        {
+            connectedUsers = state.connectedUsers.ToArray();
+
+            foreach(var user in connectedUsers)
+            {
+                Console.WriteLine(user.username);
+            }
         }
     }
 }
